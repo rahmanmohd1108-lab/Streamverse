@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Mail, KeyRound } from "lucide-react";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiPost } from "@/lib/api/client";
 import { APP_NAME } from "@/lib/constants";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const { toast } = useToast();
@@ -116,5 +116,13 @@ export default function LoginPage() {
         </p>
       </CardFooter>
     </Card>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }
