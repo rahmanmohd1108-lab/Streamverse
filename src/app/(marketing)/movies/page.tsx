@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/streamverse/empty-states";
 import { CardGridSkeleton } from "@/components/streamverse/loading-states";
 import { APP_NAME } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Movies — Browse",
   description: `Browse the full ${APP_NAME} movie catalog by genre, language, year, and popularity.`,
