@@ -10,6 +10,8 @@ import { APP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 24;
 
 function asString(v: string | string[] | undefined): string | undefined {
