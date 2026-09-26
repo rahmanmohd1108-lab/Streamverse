@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Mail, KeyRound, User, Check, X } from "lucide-react";
@@ -19,7 +19,7 @@ interface PwCheck {
   number: boolean;
 }
 
-export default function RegisterPage() {
+function RegisterInner() {
   const router = useRouter();
   const sp = useSearchParams();
   const { toast } = useToast();
@@ -188,5 +188,13 @@ function PwItem({ ok, label }: { ok: boolean; label: string }) {
       {ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
       {label}
     </li>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterInner />
+    </Suspense>
   );
 }
