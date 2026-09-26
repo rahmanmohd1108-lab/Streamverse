@@ -1,0 +1,525 @@
+// StreamVerse Prisma schema — OTT/VOD streaming platform
+// SQLite for local dev (swap to PostgreSQL for production via DATABASE_URL).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================
+// Users, Profiles, Auth
+// =====================================================
+
+model User {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  passwordHash    String?
+  authProvider     String? @default("credentials") // credentials | google
+  providerAccountId String?
+  image           String?
+  role            String   @default("USER") // USER | ADMIN | CONTENT_MANAGER
+  status          String   @default("ACTIVE") // ACTIVE | SUSPENDED | DELETED
+  emailVerified   DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profiles        Profile[]
+  accounts        Account[]
+  subscriptions   Subscription[]
+  payments        Payment[]
+  auditLogs       AdminAuditLog[]
+  notifications   Notification[]
+  preferences     NotificationPreference?
+
+  @@index([role])
+  @@index([status])
+}
+
+model Profile {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  avatar        String?
+  language      String   @default("en")
+  maturityLevel String   @default("ALL") // ALL | 7+ | 13+ | 16+ | 18+
+  isKids        Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  watchlist     Watchlist[]
+  history       WatchHistory[]
+  ratings       Rating[]
+  notifications Notification[]
+  contentView   ContentView[]
+
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  provider          String // credentials | google
+  providerAccountId String
+  type              String // oauth | credentials
+  refreshToken     String?
+  accessToken       String?
+  expiresAt         Int?
+  tokenType         String?
+  scope             String?
+  idToken           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id         String   @id @default(cuid())
+  email      String
+  token      String   @unique
+  expires    DateTime
+  used       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+}
+
+// =====================================================
+// Genres, Categories, Languages
+// =====================================================
+
+model Genre {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movies    Movie[]
+  series    Series[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movies    Movie[]
+  series    Series[]
+}
+
+model Language {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movies    Movie[]
+  series    Series[]
+}
+
+// =====================================================
+// Movies, Series, Seasons, Episodes
+// =====================================================
+
+model Movie {
+  id              String    @id @default(cuid())
+  title           String
+  slug            String    @unique
+  description     String
+  releaseYear     Int
+  duration        Int       // seconds
+  ageRating       String    @default("ALL")
+  posterUrl       String?
+  backdropUrl     String?
+  trailerUrl      String?
+  videoUrl        String?   // HLS master URL or mp4
+  videoProvider   String?   @default("demo") // demo | mux | s3 | external
+  hlsUrl          String?
+  languageId      String?
+  country         String?
+  cast            String?
+  director        String?
+  status          String    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  isFeatured      Boolean   @default(false)
+  isTrending      Boolean   @default(false)
+  isPopular       Boolean   @default(false)
+  isNewRelease    Boolean   @default(false)
+  isRecommended   Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  language        Language?  @relation(fields: [languageId], references: [id])
+  genres          Genre[]
+  categories      Category[]
+  watchlist       Watchlist[]
+  history         WatchHistory[]
+  ratings         Rating[]
+  subtitles       Subtitle[]
+
+  @@index([status])
+  @@index([releaseYear])
+  @@index([languageId])
+  @@index([slug])
+  @@index([isFeatured])
+  @@index([isTrending])
+  @@index([isPopular])
+  @@index([isNewRelease])
+}
+
+model Series {
+  id              String    @id @default(cuid())
+  title           String
+  slug            String    @unique
+  description     String
+  releaseYear     Int
+  posterUrl       String?
+  backdropUrl     String?
+  trailerUrl      String?
+  languageId      String?
+  ageRating       String    @default("ALL")
+  country         String?
+  cast            String?
+  director        String?
+  status          String    @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  isFeatured      Boolean   @default(false)
+  isTrending      Boolean   @default(false)
+  isPopular       Boolean   @default(false)
+  isNewRelease    Boolean   @default(false)
+  isRecommended   Boolean   @default(false)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  language        Language?  @relation(fields: [languageId], references: [id])
+  genres          Genre[]
+  categories      Category[]
+  seasons         Season[]
+  watchlist       Watchlist[]
+  history         WatchHistory[]
+  ratings         Rating[]
+  subtitles       Subtitle[]
+
+  @@index([status])
+  @@index([releaseYear])
+  @@index([languageId])
+  @@index([slug])
+  @@index([isFeatured])
+  @@index([isTrending])
+  @@index([isPopular])
+  @@index([isNewRelease])
+}
+
+model Season {
+  id            String   @id @default(cuid())
+  seriesId      String
+  seasonNumber  Int
+  title         String?
+  description   String?
+  posterUrl     String?
+  releaseDate   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  series        Series   @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  episodes      Episode[]
+
+  @@unique([seriesId, seasonNumber])
+  @@index([seriesId])
+}
+
+model Episode {
+  id              String   @id @default(cuid())
+  seasonId        String
+  episodeNumber   Int
+  title           String
+  description     String?
+  duration        Int      // seconds
+  thumbnailUrl    String?
+  videoUrl        String?
+  hlsUrl          String?
+  videoProvider   String?  @default("demo")
+  releaseDate     DateTime?
+  isPreview       Boolean  @default(false)
+  skipIntroStart  Int?     // seconds
+  skipIntroEnd    Int?     // seconds
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  season          Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  subtitles       Subtitle[]
+  history         WatchHistory[]
+
+  @@unique([seasonId, episodeNumber])
+  @@index([seasonId])
+}
+
+model Subtitle {
+  id          String   @id @default(cuid())
+  language    String
+  url         String
+  kind        String   @default("subtitles") // subtitles | captions | descriptions
+  movieId     String?
+  seriesId    String?
+  episodeId   String?
+  createdAt   DateTime @default(now())
+
+  movie       Movie?   @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  series      Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  episode     Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@index([movieId])
+  @@index([seriesId])
+  @@index([episodeId])
+}
+
+// =====================================================
+// User Activity
+// =====================================================
+
+model Watchlist {
+  id          String   @id @default(cuid())
+  profileId   String
+  contentId   String
+  contentType String   // movie | series
+  createdAt   DateTime @default(now())
+
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  movie       Movie?   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  series      Series?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, contentId, contentType])
+  @@index([profileId])
+}
+
+model WatchHistory {
+  id              String   @id @default(cuid())
+  profileId       String
+  contentId       String
+  contentType     String   // movie | series | episode
+  episodeId       String?
+  progressSeconds Int      @default(0)
+  durationSeconds Int      @default(0)
+  completed       Boolean  @default(false)
+  lastWatchedAt   DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  profile         Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  movie           Movie?   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  series          Series?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  episode         Episode? @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, contentId, contentType, episodeId])
+  @@index([profileId, lastWatchedAt])
+  @@index([profileId, contentId])
+}
+
+model Rating {
+  id          String   @id @default(cuid())
+  profileId   String
+  contentId   String
+  contentType String   // movie | series
+  rating      Int      // 1-5
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  movie       Movie?   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  series      Series?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, contentId, contentType])
+  @@index([contentId])
+}
+
+model ContentView {
+  id          String   @id @default(cuid())
+  profileId   String
+  contentId   String
+  contentType String // movie | series | episode
+  episodeId   String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+  duration    Int      @default(0)
+
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([contentId])
+  @@index([startedAt])
+}
+
+// =====================================================
+// Subscriptions & Payments
+// =====================================================
+
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  slug          String   @unique
+  price         Float
+  currency      String   @default("INR")
+  billingPeriod String   @default("MONTHLY") // MONTHLY | YEARLY
+  features      String
+  isPremium     Boolean  @default(false)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id                      String   @id @default(cuid())
+  userId                  String
+  planId                  String
+  status                  String   @default("ACTIVE") // ACTIVE | CANCELLED | EXPIRED | PENDING
+  startDate               DateTime @default(now())
+  endDate                 DateTime?
+  paymentProviderReference String?
+  autoRenew               Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                    SubscriptionPlan @relation(fields: [planId], references: [id])
+  payments                Payment[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Payment {
+  id                String   @id @default(cuid())
+  userId            String
+  subscriptionId   String?
+  amount            Float
+  currency          String   @default("INR")
+  provider          String   @default("demo") // demo | razorpay | stripe
+  providerReference String?
+  status            String   @default("PENDING") // PENDING | SUCCESS | FAILED | REFUNDED
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+// =====================================================
+// Banners & Notifications
+// =====================================================
+
+model Banner {
+  id               String   @id @default(cuid())
+  title            String
+  imageUrl         String?
+  videoUrl         String?
+  contentId        String?
+  contentType      String? // movie | series
+  active           Boolean  @default(true)
+  displayOrder     Int      @default(0)
+  startDate        DateTime?
+  endDate          DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([active, displayOrder])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  profileId   String?
+  title       String
+  message     String
+  type        String   @default("info") // info | content | subscription | account
+  read        Boolean  @default(false)
+  actionUrl   String?
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile     Profile? @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  id          String   @id @default(cuid())
+  userId      String
+  email       Boolean  @default(true)
+  push        Boolean  @default(true)
+  newContent  Boolean  @default(true)
+  subscription Boolean @default(true)
+  account     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
+}
+
+// =====================================================
+// Admin Audit Log
+// =====================================================
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      String // create | update | delete | publish | archive
+  resource    String // movie | series | episode | user | banner | plan
+  resourceId  String?
+  metadata    String? // JSON
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  admin       User     @relation(fields: [adminId], references: [id])
+
+  @@index([adminId, createdAt])
+  @@index([resource, resourceId])
+}
+
+// =====================================================
+// Analytics
+// =====================================================
+
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  eventType   String // view | search | watchlist_add | watch_start | watch_complete
+  userId      String?
+  profileId   String?
+  contentId   String?
+  contentType String?
+  metadata    String? // JSON
+  createdAt   DateTime @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([contentId])
+  @@index([userId])
+}
